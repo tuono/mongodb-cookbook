@@ -244,7 +244,9 @@ module MongoDB
             @new_resource.connection['host'],
             @new_resource.connection['port'],
             connect_timeout: 15,
-            slave_ok: true
+            slave_ok: true,
+            ssl: ssl_enabled?,
+            ssl_verify: ssl_verify?
           )
         rescue Mongo::ConnectionFailure
           if attempt < @new_resource.connection['user_management']['connection']['retries']
@@ -270,7 +272,9 @@ module MongoDB
             connect_timeout: 5,
             socket_timeout: 5,
             max_read_retries: 5,
-            server_selection_timeout: 3
+            server_selection_timeout: 3,
+            ssl: ssl_enabled?,
+            ssl_verify: ssl_verify?
           )
 
           # Query the server for all database names to verify server connection
@@ -284,6 +288,17 @@ module MongoDB
         end
 
         client
+      end
+
+      def ssl_enabled?
+        enabled = false
+        enabled = true if node.read('mongodb', 'config', 'mongod', 'net', 'ssl', 'mode') == 'requireSSL'
+        enabled = true if node.read('mongodb', 'config', 'mongod', 'net', 'tls', 'mode') == 'requireTLS'
+        enabled
+      end
+
+      def ssl_verify?
+        false
       end
     end
   end

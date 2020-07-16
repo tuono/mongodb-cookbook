@@ -85,7 +85,7 @@ class Chef::ResourceDefinitionList::MongoDB
     begin
       connection = nil
       rescue_connection_failure do
-        connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true)
+        connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true, ssl: ssl_enabled?(node))
         connection.database_names # check connection
       end
     rescue => e
@@ -128,7 +128,7 @@ class Chef::ResourceDefinitionList::MongoDB
       mongo_configured_host, mongo_configured_port = \
         Regexp.last_match.nil? || Regexp.last_match.length < 2 ? [mongo_host, mongo_port] : Regexp.last_match[1].split(':')
       begin
-        connection = Mongo::Connection.new(mongo_configured_host, mongo_configured_port, op_timeout: 5, slave_ok: true)
+        connection = Mongo::Connection.new(mongo_configured_host, mongo_configured_port, op_timeout: 5, slave_ok: true, ssl: ssl_enabled?(node))
       rescue
         abort("Could not connect to database: '#{mongo_host}:#{mongo_port}'")
       end
@@ -175,7 +175,7 @@ class Chef::ResourceDefinitionList::MongoDB
           result = admin.command(cmd, check_response: false)
         rescue Mongo::ConnectionFailure
           # reconfiguring destroys existing connections, reconnect
-          connection = Mongo::Connection.new('localhost', node['mongodb']['config']['port'], op_timeout: 5, slave_ok: true)
+          connection = Mongo::Connection.new('localhost', node['mongodb']['config']['port'], op_timeout: 5, slave_ok: true, ssl: ssl_enabled?(node))
           config = connection['local']['system']['replset'].find_one('_id' => name)
           # Validate configuration change
           if config['members'] == rs_members
@@ -215,7 +215,7 @@ class Chef::ResourceDefinitionList::MongoDB
           when 0
             # deletes the replicaset
             force = true
-            rs_connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true)
+            rs_connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true, ssl: ssl_enabled?(node))
           else
             rs_connection = Mongo::ReplSetConnection.new(old_members.map { |m| m['host'] })
           end
@@ -232,7 +232,7 @@ class Chef::ResourceDefinitionList::MongoDB
           result = admin.command(cmd, force: force, check_response: false)
         rescue Mongo::ConnectionFailure
           # reconfiguring destroys existing connections, reconnect
-          connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true)
+          connection = Mongo::Connection.new(mongo_host, mongo_port, op_timeout: 5, slave_ok: true, ssl: ssl_enabled?(node))
           config = connection['local']['system']['replset'].find_one('_id' => name)
           # Validate configuration change
           if config['members'] == rs_members
@@ -284,7 +284,7 @@ class Chef::ResourceDefinitionList::MongoDB
     begin
       connection = nil
       rescue_connection_failure do
-        connection = Mongo::Connection.new('localhost', mongo_port, op_timeout: 5)
+        connection = Mongo::Connection.new('localhost', mongo_port, op_timeout: 5, ssl: ssl_enabled?(node))
       end
     rescue => e
       Chef::Log.warn("Could not connect to database: 'localhost:#{mongo_port}', reason #{e}")
@@ -336,7 +336,7 @@ class Chef::ResourceDefinitionList::MongoDB
     begin
       connection = nil
       rescue_connection_failure do
-        connection = Mongo::Connection.new('localhost', mongo_port, op_timeout: 5)
+        connection = Mongo::Connection.new('localhost', mongo_port, op_timeout: 5, ssl: ssl_enabled?(node))
       end
     rescue => e
       Chef::Log.warn("Could not connect to database: 'localhost:#{mongo_port}', reason #{e}")
@@ -414,5 +414,12 @@ class Chef::ResourceDefinitionList::MongoDB
       sleep(0.5)
       retry
     end
+  end
+
+  def self.ssl_enabled?(node)
+    enabled = false
+    enabled = true if node.read('mongodb', 'config', 'mongod', 'net', 'ssl', 'mode') == 'requireSSL'
+    enabled = true if node.read('mongodb', 'config', 'mongod', 'net', 'tls', 'mode') == 'requireTLS'
+    enabled
   end
 end

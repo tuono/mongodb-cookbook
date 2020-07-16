@@ -44,6 +44,7 @@ users.each do |user|
       action :nothing
       subscribes :add, 'ruby_block[config_replicaset]', :delayed
       subscribes :add, 'ruby_block[config_sharding]', :delayed
+      subscribes :add, 'ruby_block[wait_mongodb_node_count]', :delayed
     else
       action user['action'] || :add
     end
